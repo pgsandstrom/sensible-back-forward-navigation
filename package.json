@@ -1,0 +1,100 @@
+{
+  "name": "sensible-back-forward-navigation",
+  "displayName": "sensible-back-forward-navigation",
+  "description": "Improve 'go back' and 'go forward' command is vscode. Movement is grouped in a sensible way.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.42.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pgsandstrom/sensible-back-forward-navigation.git"
+  },
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "Sensible back forward navigation",
+      "properties": {
+        "sensible-back-forward-navigation.logDebug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log a bunch of stuff to the console. Use if submitting a bug report."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "sensible-back-forward-navigation.goBack",
+        "title": "Go back sensibly"
+      },
+      {
+        "command": "sensible-back-forward-navigation.goForward",
+        "title": "Go forward sensibly"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "sensible-back-forward-navigation.goBack",
+        "key": "alt+h",
+        "mac": "alt+h"
+      },
+      {
+        "command": "sensible-back-forward-navigation.goForward",
+        "key": "alt+l",
+        "mac": "alt+l"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "pretest": "npm run compile",
+    "pre-commit": "lint-staged",
+    "pre-push": "cross-env CI=true npm run test",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/glob": "7.1.1",
+    "@types/mocha": "5.2.7",
+    "@types/node": "12.11.7",
+    "@types/vscode": "1.42.0",
+    "@typescript-eslint/eslint-plugin": "2.14.0",
+    "@typescript-eslint/parser": "2.14.0",
+    "cross-env": "7.0.0",
+    "eslint": "6.7.2",
+    "glob": "7.1.6",
+    "husky": "4.2.3",
+    "lint-staged": "10.0.7",
+    "mocha": "6.2.2",
+    "prettier": "1.19.1",
+    "typescript": "3.8.2",
+    "tslint": "5.20.0",
+    "tslint-config-prettier": "1.18.0",
+    "vsce": "1.73.0",
+    "vscode-test": "1.3.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run pre-commit",
+      "pre-push": "npm run pre-push"
+    }
+  },
+  "lint-staged": {
+    "*.{json,md,ts,tsx,css,scss}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "node ./node_modules/eslint/bin/eslint.js --ext .ts --ext .tsx --fix",
+      "tslint --fix"
+    ]
+  }
+}
