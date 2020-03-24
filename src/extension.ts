@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { getConfig } from './config'
+import { getConfig, reloadConfig } from './config'
 
 interface Movement {
   filepath: string
@@ -15,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   const fileSystemWatcher = vscode.workspace.createFileSystemWatcher('**/*', false, true, false)
   const onDelete = fileSystemWatcher.onDidDelete((uri: vscode.Uri) => {
-    movementList = movementList.filter(movement => {
+    movementList = movementList.filter((movement) => {
       if (movement.filepath === uri.path) {
         if (getConfig().logDebug) {
           console.log(`Removing movement due to file being deleted: ${uri.path}`)
@@ -42,7 +42,19 @@ export function activate(context: vscode.ExtensionContext) {
 
   const selectionChangeListener = vscode.window.onDidChangeTextEditorSelection(
     (e: vscode.TextEditorSelectionChangeEvent) => {
-      // TODO
+      if (movementList.length > movementPosition + 1) {
+        movementList = movementList.slice(0, movementPosition + 1)
+      }
+
+      const selection = e.selections[e.selections.length - 1]
+      const movement: Movement = {
+        filepath: e.textEditor.document.uri.path,
+        line: selection.start.line,
+        character: selection.start.character,
+      }
+      movementList.push(movement)
+      movementPosition += 1
+      console.log(`saving movement: ${selection.start.line}, ${selection.start.character}`)
     },
   )
 
@@ -50,9 +62,57 @@ export function activate(context: vscode.ExtensionContext) {
     // TODO
   }
 
-  const goBack = () => {}
+  const goBack = () => {
+    if (movementPosition > 0) {
+      console.log('going back')
+      movementPosition -= 1
+    }
+    moveToMovement()
+  }
 
-  const goForward = () => {}
+  const goForward = () => {
+    if (movementPosition !== -1 && movementPosition < movementList.length - 1) {
+      console.log('going forward')
+      movementPosition += 1
+    }
+    moveToMovement()
+  }
+
+  const moveToMovement = async () => {
+    console.log(`moveToMovement:${movementPosition}, ${movementList.length}`)
+    if (movementPosition === -1) {
+      return
+    }
+    const movement = movementList[movementPosition]
+    const activeFilepath = vscode.window.activeTextEditor?.document.uri.path
+
+    let activeEditor: vscode.TextEditor
+    if (activeFilepath !== movement.filepath) {
+      const textdocument = await vscode.workspace.openTextDocument(movement.filepath)
+      activeEditor = await vscode.window.showTextDocument(textdocument)
+    } else {
+      activeEditor = vscode.window.activeTextEditor!
+    }
+
+    activeEditor.selection = new vscode.Selection(
+      movement.line,
+      movement.character,
+      movement.line,
+      movement.character,
+    )
+    const rangeToReveal = new vscode.Range(
+      movement.line,
+      movement.character,
+      movement.line,
+      movement.character,
+    )
+    activeEditor.revealRange(
+      rangeToReveal,
+      getConfig().centerOnMovement
+        ? vscode.TextEditorRevealType.InCenterIfOutsideViewport
+        : vscode.TextEditorRevealType.Default,
+    )
+  }
 
   const goBackCommand = vscode.commands.registerCommand(
     'sensible-back-forward-navigation.goBack',
@@ -64,14 +124,22 @@ export function activate(context: vscode.ExtensionContext) {
     goForward,
   )
 
+  const onConfigChange = vscode.workspace.onDidChangeConfiguration((e) => {
+    if (e.affectsConfiguration('navigateEditHistory')) {
+      reloadConfig()
+    }
+  })
+
   context.subscriptions.push(
     onDelete,
     documentChangeListener,
     selectionChangeListener,
     goBackCommand,
     goForwardCommand,
+    onConfigChange,
   )
 }
 
-// this method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+  //
+}
