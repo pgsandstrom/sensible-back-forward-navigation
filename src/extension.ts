@@ -13,6 +13,9 @@ export function activate(context: vscode.ExtensionContext) {
   let movementList: Movement[] = []
   let movementPosition = -1
 
+  let nextMovementIsCausedByThisExtension = false
+  let ignoredMovement: undefined | Movement
+
   const fileSystemWatcher = vscode.workspace.createFileSystemWatcher('**/*', false, true, false)
   const onDelete = fileSystemWatcher.onDidDelete((uri: vscode.Uri) => {
     movementList = movementList.filter((movement) => {
@@ -26,24 +29,39 @@ export function activate(context: vscode.ExtensionContext) {
     })
   })
 
-  const documentChangeListener = vscode.workspace.onDidChangeTextDocument(
-    (e: vscode.TextDocumentChangeEvent) => {
-      const filepath = e.document.uri.path
+  // const documentChangeListener = vscode.workspace.onDidChangeTextDocument(
+  //   (e: vscode.TextDocumentChangeEvent) => {
+  //     const filepath = e.document.uri.path
 
-      if (e.contentChanges.length === 0) {
-        return
-      }
+  //     if (e.contentChanges.length === 0) {
+  //       return
+  //     }
 
-      // we only use the last content change, because often that seems to be the relevant one:
-      const lastContentChange = e.contentChanges[e.contentChanges.length - 1]
-      handleContentChange(lastContentChange, filepath)
-    },
-  )
+  //     // we only use the last content change, because often that seems to be the relevant one:
+  //     const lastContentChange = e.contentChanges[e.contentChanges.length - 1]
+  //     handleContentChange(lastContentChange, filepath)
+  //   },
+  // )
+
+  const isMovementsClose = (m1: Movement, m2: Movement): boolean => {
+    if (m1.filepath !== m2.filepath) {
+      return false
+    }
+
+    const lineDiff = Math.abs(m1.line - m2.line)
+    const characterDiff = Math.abs(m1.character - m2.character)
+    if (lineDiff + characterDiff < 2) {
+      return true
+    }
+
+    return false
+  }
 
   const selectionChangeListener = vscode.window.onDidChangeTextEditorSelection(
     (e: vscode.TextEditorSelectionChangeEvent) => {
-      if (movementList.length > movementPosition + 1) {
-        movementList = movementList.slice(0, movementPosition + 1)
+      if (nextMovementIsCausedByThisExtension) {
+        nextMovementIsCausedByThisExtension = false
+        return
       }
 
       const selection = e.selections[e.selections.length - 1]
@@ -52,15 +70,37 @@ export function activate(context: vscode.ExtensionContext) {
         line: selection.start.line,
         character: selection.start.character,
       }
+
+      if (ignoredMovement !== undefined && isMovementsClose(movement, ignoredMovement)) {
+        console.log('too close to ignored movement')
+        ignoredMovement = movement
+        return
+      }
+
+      if (movementList.length > 0) {
+        const latestMovement = movementList[movementPosition]
+        if (isMovementsClose(movement, latestMovement)) {
+          ignoredMovement = movement
+          return
+        }
+      }
+
+      // if we step back in history and then makes a new movement, abondon the old "branch"
+      if (movementList.length > movementPosition + 1) {
+        movementList = movementList.slice(0, movementPosition + 1)
+        console.log(`abandoning ${movementList.length - (movementPosition + 1)} items`)
+      }
+
       movementList.push(movement)
       movementPosition += 1
       console.log(`saving movement: ${selection.start.line}, ${selection.start.character}`)
+      console.log(`length: ${movementList.length}`)
     },
   )
 
-  const handleContentChange = (change: vscode.TextDocumentContentChangeEvent, filepath: string) => {
-    // TODO
-  }
+  // const handleContentChange = (change: vscode.TextDocumentContentChangeEvent, filepath: string) => {
+  //   // TODO
+  // }
 
   const goBack = () => {
     if (movementPosition > 0) {
@@ -83,6 +123,9 @@ export function activate(context: vscode.ExtensionContext) {
     if (movementPosition === -1) {
       return
     }
+
+    nextMovementIsCausedByThisExtension = true
+
     const movement = movementList[movementPosition]
     const activeFilepath = vscode.window.activeTextEditor?.document.uri.path
 
@@ -132,7 +175,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     onDelete,
-    documentChangeListener,
+    // documentChangeListener,
     selectionChangeListener,
     goBackCommand,
     goForwardCommand,
