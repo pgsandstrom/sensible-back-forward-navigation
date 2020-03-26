@@ -7,11 +7,16 @@ interface Movement {
   character: number
 }
 
+interface Position {
+  line: number
+  character: number
+}
+
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
   let movementList: Movement[] = []
-  let movementPosition = -1
+  let stepsBack = 0
 
   let nextMovementIsCausedByThisExtension = false
   let ignoredMovement: undefined | Movement
@@ -29,27 +34,30 @@ export function activate(context: vscode.ExtensionContext) {
     })
   })
 
-  // const documentChangeListener = vscode.workspace.onDidChangeTextDocument(
-  //   (e: vscode.TextDocumentChangeEvent) => {
-  //     const filepath = e.document.uri.path
+  const documentChangeListener = vscode.workspace.onDidChangeTextDocument(
+    (e: vscode.TextDocumentChangeEvent) => {
+      const filepath = e.document.uri.path
 
-  //     if (e.contentChanges.length === 0) {
-  //       return
-  //     }
+      if (e.contentChanges.length === 0) {
+        return
+      }
 
-  //     // we only use the last content change, because often that seems to be the relevant one:
-  //     const lastContentChange = e.contentChanges[e.contentChanges.length - 1]
-  //     handleContentChange(lastContentChange, filepath)
-  //   },
-  // )
+      // we only use the last content change, because often that seems to be the relevant one:
+      const lastContentChange = e.contentChanges[e.contentChanges.length - 1]
+      handleContentChange(lastContentChange, filepath)
+    },
+  )
 
   const isMovementsClose = (m1: Movement, m2: Movement): boolean => {
     if (m1.filepath !== m2.filepath) {
       return false
     }
+    return isPositionClose(m1, m2)
+  }
 
-    const lineDiff = Math.abs(m1.line - m2.line)
-    const characterDiff = Math.abs(m1.character - m2.character)
+  const isPositionClose = (p1: Position, p2: Position) => {
+    const lineDiff = Math.abs(p1.line - p2.line)
+    const characterDiff = Math.abs(p1.character - p2.character)
     if (lineDiff + characterDiff < 2) {
       return true
     }
@@ -57,76 +65,137 @@ export function activate(context: vscode.ExtensionContext) {
     return false
   }
 
+  const getLatestMovement = (): Movement | undefined => {
+    const latestMovement = movementList[movementList.length - 1 - stepsBack]
+    return latestMovement
+  }
+
+  const printLookingAt = () => {
+    const pointingAtMovement = getLatestMovement()
+    if (pointingAtMovement) {
+      console.log(`Pointing at ${pointingAtMovement.line},${pointingAtMovement.character}`)
+    } else {
+      console.log('no previous movement')
+    }
+  }
+
   const selectionChangeListener = vscode.window.onDidChangeTextEditorSelection(
     (e: vscode.TextEditorSelectionChangeEvent) => {
-      if (nextMovementIsCausedByThisExtension) {
-        nextMovementIsCausedByThisExtension = false
-        return
-      }
+      try {
+        if (nextMovementIsCausedByThisExtension) {
+          nextMovementIsCausedByThisExtension = false
+          return
+        }
 
-      const selection = e.selections[e.selections.length - 1]
-      const movement: Movement = {
-        filepath: e.textEditor.document.uri.path,
-        line: selection.start.line,
-        character: selection.start.character,
-      }
+        const selection = e.selections[e.selections.length - 1]
+        const movement: Movement = {
+          filepath: e.textEditor.document.uri.path,
+          line: selection.start.line,
+          character: selection.start.character,
+        }
 
-      if (ignoredMovement !== undefined && isMovementsClose(movement, ignoredMovement)) {
-        console.log('too close to ignored movement')
-        ignoredMovement = movement
-        return
-      }
-
-      if (movementList.length > 0) {
-        const latestMovement = movementList[movementPosition]
-        if (isMovementsClose(movement, latestMovement)) {
+        if (ignoredMovement !== undefined && isMovementsClose(movement, ignoredMovement)) {
+          console.log('too close to ignored movement')
           ignoredMovement = movement
           return
         }
-      }
 
-      // if we step back in history and then makes a new movement, abondon the old "branch"
-      if (movementList.length > movementPosition + 1) {
-        movementList = movementList.slice(0, movementPosition + 1)
-        console.log(`abandoning ${movementList.length - (movementPosition + 1)} items`)
-      }
+        const latestMovement = getLatestMovement()
+        if (latestMovement !== undefined) {
+          if (isMovementsClose(movement, latestMovement)) {
+            console.log('too close to latest movement')
+            ignoredMovement = movement
+            return
+          }
+        }
 
-      movementList.push(movement)
-      movementPosition += 1
-      console.log(`saving movement: ${selection.start.line}, ${selection.start.character}`)
-      console.log(`length: ${movementList.length}`)
+        // if we step back in history and then makes a new movement, abondon the old "branch"
+        if (stepsBack > 0) {
+          console.log(`currently ${movementList.length} items`)
+          console.log(`at ${stepsBack} steps back`)
+          console.log(`abandoning ${stepsBack} items`)
+          movementList = movementList.slice(0, movementList.length - stepsBack)
+          console.log(`after abandoning we now have ${movementList.length} items`)
+          printLookingAt()
+        }
+
+        movementList.push(movement)
+        console.log(`saving movement: ${selection.start.line}, ${selection.start.character}`)
+        console.log(`we now have ${movementList.length} items`)
+        printLookingAt()
+
+        stepsBack = 0
+      } catch (e) {
+        console.error(`crash in selectionChangeListener`)
+        console.error(e)
+      }
     },
   )
 
-  // const handleContentChange = (change: vscode.TextDocumentContentChangeEvent, filepath: string) => {
-  //   // TODO
-  // }
+  const handleContentChange = (change: vscode.TextDocumentContentChangeEvent, filepath: string) => {
+    console.log('handleContentChange')
+    // TODO fix so we change history when files are edited
+  }
 
   const goBack = () => {
-    if (movementPosition > 0) {
-      console.log('going back')
-      movementPosition -= 1
+    if (stepsBack >= movementList.length - 1) {
+      console.log(`cannot go further back: ${movementList.length}, ${stepsBack}`)
+      return
     }
+
+    if (movementList.length === 0) {
+      return
+    }
+
+    const latestMovement = movementList[movementList.length - 1]
+
+    const activeFilePath = vscode.window.activeTextEditor?.document.uri.path
+    const activePosition = vscode.window.activeTextEditor?.selection.active
+
+    if (activePosition === undefined) {
+      console.error('cannot go further back')
+      return
+    }
+
+    // If we have not taken any steps back, but are still not close to the latest saved movement,
+    // then we have taken "ignored" steps away from that movement. Thus we begin with just moving to the last saved movement.
+    if (
+      stepsBack === 0 &&
+      activePosition !== undefined &&
+      (latestMovement.filepath !== activeFilePath ||
+        isPositionClose(latestMovement, activePosition) === false)
+    ) {
+      console.log('Weird go back: Just move back to the latest saved movement')
+      console.log(latestMovement.line)
+      console.log(latestMovement.character)
+      console.log(activePosition.line)
+      console.log(activePosition.character)
+    } else {
+      console.log(`Normal go back`)
+      stepsBack += 1
+    }
+
     moveToMovement()
   }
 
   const goForward = () => {
-    if (movementPosition !== -1 && movementPosition < movementList.length - 1) {
+    if (stepsBack > 0) {
       console.log('going forward')
-      movementPosition += 1
+      stepsBack -= 1
     }
     moveToMovement()
   }
 
   const moveToMovement = async () => {
-    console.log(`moveToMovement:${movementPosition}, ${movementList.length}`)
-    if (movementPosition === -1) {
+    const movement = getLatestMovement()
+    if (movement === undefined) {
       return
     }
 
+    console.log(`move to ${stepsBack} steps back`)
+
     nextMovementIsCausedByThisExtension = true
 
-    const movement = movementList[movementPosition]
     const activeFilepath = vscode.window.activeTextEditor?.document.uri.path
 
     let activeEditor: vscode.TextEditor
@@ -155,6 +224,9 @@ export function activate(context: vscode.ExtensionContext) {
         ? vscode.TextEditorRevealType.InCenterIfOutsideViewport
         : vscode.TextEditorRevealType.Default,
     )
+
+    // TODO is our whole movementPosition super confusing?
+    // movementPosition += 1
   }
 
   const goBackCommand = vscode.commands.registerCommand(
@@ -168,14 +240,14 @@ export function activate(context: vscode.ExtensionContext) {
   )
 
   const onConfigChange = vscode.workspace.onDidChangeConfiguration((e) => {
-    if (e.affectsConfiguration('navigateEditHistory')) {
+    if (e.affectsConfiguration('sensible-back-forward-navigation')) {
       reloadConfig()
     }
   })
 
   context.subscriptions.push(
     onDelete,
-    // documentChangeListener,
+    documentChangeListener,
     selectionChangeListener,
     goBackCommand,
     goForwardCommand,
