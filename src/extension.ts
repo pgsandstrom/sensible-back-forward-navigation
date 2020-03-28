@@ -87,6 +87,12 @@ export function activate(context: vscode.ExtensionContext) {
           character: selection.start.character,
         }
 
+        // When switching tab from file A to file B, a selection change event is triggered at the start of file A
+        // This is an attempt to ignore that event
+        if (movement.line === 0 && movement.character === 0 && e.kind === undefined) {
+          return
+        }
+
         if (ignoredMovement !== undefined && isMovementsClose(movement, ignoredMovement)) {
           console.log('too close to ignored movement')
           ignoredMovement = movement
