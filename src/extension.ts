@@ -15,6 +15,8 @@ interface Position {
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+  const MAX_MOVEMENT_SAVED = 300 // TODO make into config
+
   let movementList: Movement[] = []
   let stepsBack = 0
 
@@ -70,15 +72,6 @@ export function activate(context: vscode.ExtensionContext) {
     return latestMovement
   }
 
-  const printLookingAt = () => {
-    const pointingAtMovement = getLatestMovement()
-    if (pointingAtMovement) {
-      console.log(`Pointing at ${pointingAtMovement.line},${pointingAtMovement.character}`)
-    } else {
-      console.log('no previous movement')
-    }
-  }
-
   const selectionChangeListener = vscode.window.onDidChangeTextEditorSelection(
     (e: vscode.TextEditorSelectionChangeEvent) => {
       try {
@@ -116,13 +109,14 @@ export function activate(context: vscode.ExtensionContext) {
           console.log(`abandoning ${stepsBack} items`)
           movementList = movementList.slice(0, movementList.length - stepsBack)
           console.log(`after abandoning we now have ${movementList.length} items`)
-          printLookingAt()
         }
 
         movementList.push(movement)
+        if (movementList.length > MAX_MOVEMENT_SAVED) {
+          movementList = movementList.slice(50)
+        }
         console.log(`saving movement: ${selection.start.line}, ${selection.start.character}`)
         console.log(`we now have ${movementList.length} items`)
-        printLookingAt()
 
         stepsBack = 0
       } catch (e) {
