@@ -12,8 +12,8 @@ interface Position {
   character: number
 }
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
+// TODO if we stand at the end of a line and move one step to a shorter line, then it will never be ignored, because it wont be "close by". Fix this.
+// TODO if we edit one spot, then step line by line to another spot and edit it, then only one movement is saved. This seems wrong.
 export function activate(context: vscode.ExtensionContext) {
   const MAX_MOVEMENT_SAVED = 300 // TODO make into config
 
