@@ -2,7 +2,7 @@
   "name": "sensible-back-forward-navigation",
   "displayName": "Sensible back and forward navigation",
   "description": "Improve 'go back' and 'go forward' command is vscode. Movement is grouped in a sensible way.",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "publisher": "codeandstuff",
   "engines": {
     "vscode": "^1.51.0"
