@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import { getConfig, reloadConfig } from './config'
+import { debug } from './util/log-util'
 
 interface Movement {
   filepath: string
@@ -11,6 +12,8 @@ interface Position {
   line: number
   character: number
 }
+
+// TODO maybe create a movement at the current position when the extension is loaded?
 
 // TODO if we stand at the end of a line and move one step to a shorter line, then it will never be ignored, because it wont be "close by". Fix this.
 // TODO if we edit one spot, then step line by line to another spot and edit it, then only one movement is saved. This seems wrong.
@@ -27,9 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
   const onDelete = fileSystemWatcher.onDidDelete((uri: vscode.Uri) => {
     movementList = movementList.filter((movement) => {
       if (movement.filepath === uri.path) {
-        if (getConfig().logDebug) {
-          console.log(`Removing movement due to file being deleted: ${uri.path}`)
-        }
+        debug(`Removing movement due to file being deleted: ${uri.path}`)
         return false
       }
       return true
@@ -80,13 +81,16 @@ export function activate(context: vscode.ExtensionContext) {
           return
         }
 
+        // debug(JSON.stringify(e))
+        debug(`event: ${e.kind}`)
+
         // When triggering the "go to definition" this event is triggered with undefined kind, with the location often being just under the target of the "go to definition".
         // This really screws with our extension. Currently the only option is to ignore everything with undefined kind.
         // Other known stuff that has undefined kind: Switching tab. This feels okay to ignore.
         // Sometimes switching tabs triggers a buggy extra event with undefined kind and position at the top of the file. We used to have a dedicated check to ignore this event, but now it is caught here.
         // Last checked to be true at 2020-04-10, v1.44 of vscode
         if (e.kind === undefined) {
-          console.log('Ignoring undefined kind')
+          debug('Ignoring undefined kind')
           return
         }
 
@@ -98,7 +102,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         if (ignoredMovement !== undefined && isMovementsClose(movement, ignoredMovement)) {
-          console.log('too close to ignored movement')
+          debug('too close to ignored movement')
           ignoredMovement = movement
           return
         }
@@ -106,7 +110,7 @@ export function activate(context: vscode.ExtensionContext) {
         const latestMovement = getLatestMovement()
         if (latestMovement !== undefined) {
           if (isMovementsClose(movement, latestMovement)) {
-            console.log('too close to latest movement')
+            debug('too close to latest movement')
             ignoredMovement = movement
             return
           }
@@ -114,19 +118,19 @@ export function activate(context: vscode.ExtensionContext) {
 
         // if we step back in history and then makes a new movement, abondon the old "branch"
         if (stepsBack > 0) {
-          console.log(`currently ${movementList.length} items`)
-          console.log(`at ${stepsBack} steps back`)
-          console.log(`abandoning ${stepsBack} items`)
+          debug(`currently ${movementList.length} items`)
+          debug(`at ${stepsBack} steps back`)
+          debug(`abandoning ${stepsBack} items`)
           movementList = movementList.slice(0, movementList.length - stepsBack)
-          console.log(`after abandoning we now have ${movementList.length} items`)
+          debug(`after abandoning we now have ${movementList.length} items`)
         }
 
         movementList.push(movement)
         if (movementList.length > MAX_MOVEMENT_SAVED) {
           movementList = movementList.slice(50)
         }
-        console.log(`saving movement: ${selection.start.line}, ${selection.start.character}`)
-        console.log(`we now have ${movementList.length} items`)
+        debug(`saving movement: ${selection.start.line}, ${selection.start.character}`)
+        debug(`we now have ${movementList.length} items`)
 
         stepsBack = 0
       } catch (e) {
@@ -137,13 +141,13 @@ export function activate(context: vscode.ExtensionContext) {
   )
 
   const handleContentChange = (change: vscode.TextDocumentContentChangeEvent, filepath: string) => {
-    console.log('handleContentChange')
+    debug('handleContentChange')
     // TODO fix so we change history when files are edited
   }
 
   const goBack = () => {
     if (stepsBack >= movementList.length - 1) {
-      console.log(`cannot go further back: ${movementList.length}, ${stepsBack}`)
+      debug(`cannot go further back: ${movementList.length}, ${stepsBack}`)
       return
     }
 
@@ -169,13 +173,13 @@ export function activate(context: vscode.ExtensionContext) {
       (latestMovement.filepath !== activeFilePath ||
         isPositionClose(latestMovement, activePosition) === false)
     ) {
-      console.log('Weird go back: Just move back to the latest saved movement')
-      console.log(latestMovement.line)
-      console.log(latestMovement.character)
-      console.log(activePosition.line)
-      console.log(activePosition.character)
+      debug('Weird go back: Just move back to the latest saved movement')
+      debug(latestMovement.line)
+      debug(latestMovement.character)
+      debug(activePosition.line)
+      debug(activePosition.character)
     } else {
-      console.log(`Normal go back`)
+      debug(`Normal go back`)
       stepsBack += 1
     }
 
@@ -184,7 +188,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   const goForward = () => {
     if (stepsBack > 0) {
-      console.log('going forward')
+      debug('going forward')
       stepsBack -= 1
     }
     moveToMovement()
@@ -196,7 +200,7 @@ export function activate(context: vscode.ExtensionContext) {
       return
     }
 
-    console.log(`move to ${stepsBack} steps back`)
+    debug(`move to ${stepsBack} steps back`)
 
     nextMovementIsCausedByThisExtension = true
 
