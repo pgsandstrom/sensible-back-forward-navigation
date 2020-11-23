@@ -84,16 +84,6 @@ export function activate(context: vscode.ExtensionContext) {
         // debug(JSON.stringify(e))
         debug(`event: ${JSON.stringify(e.kind)}`)
 
-        // When triggering the "go to definition" this event is triggered with undefined kind, with the location often being just under the target of the "go to definition".
-        // This really screws with our extension. Currently the only option is to ignore everything with undefined kind.
-        // Other known stuff that has undefined kind: Switching tab. This feels okay to ignore.
-        // Sometimes switching tabs triggers a buggy extra event with undefined kind and position at the top of the file. We used to have a dedicated check to ignore this event, but now it is caught here.
-        // Last checked to be true at 2020-04-10, v1.44 of vscode
-        if (e.kind === undefined) {
-          debug('Ignoring undefined kind')
-          return
-        }
-
         const selection = e.selections[e.selections.length - 1]
         const movement: Movement = {
           filepath: e.textEditor.document.uri.path,
@@ -129,7 +119,9 @@ export function activate(context: vscode.ExtensionContext) {
         if (movementList.length > MAX_MOVEMENT_SAVED) {
           movementList = movementList.slice(50)
         }
-        debug(`saving movement: ${selection.start.line}, ${selection.start.character}`)
+        debug(
+          `saving movement: ${selection.start.line}, ${selection.start.character}, ${movement.filepath}`,
+        )
         debug(`we now have ${movementList.length} items`)
 
         stepsBack = 0
