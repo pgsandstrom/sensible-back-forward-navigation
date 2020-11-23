@@ -82,7 +82,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         // debug(JSON.stringify(e))
-        debug(`event: ${e.kind}`)
+        debug(`event: ${JSON.stringify(e.kind)}`)
 
         // When triggering the "go to definition" this event is triggered with undefined kind, with the location often being just under the target of the "go to definition".
         // This really screws with our extension. Currently the only option is to ignore everything with undefined kind.
@@ -169,7 +169,6 @@ export function activate(context: vscode.ExtensionContext) {
     // then we have taken "ignored" steps away from that movement. Thus we begin with just moving to the last saved movement.
     if (
       stepsBack === 0 &&
-      activePosition !== undefined &&
       (latestMovement.filepath !== activeFilePath ||
         isPositionClose(latestMovement, activePosition) === false)
     ) {
@@ -179,7 +178,7 @@ export function activate(context: vscode.ExtensionContext) {
       debug(activePosition.line)
       debug(activePosition.character)
     } else {
-      debug(`Normal go back`)
+      debug('Normal go back')
       stepsBack += 1
     }
 
