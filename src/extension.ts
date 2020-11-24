@@ -26,6 +26,17 @@ export function activate(context: vscode.ExtensionContext) {
   let nextMovementIsCausedByThisExtension = false
   let ignoredMovement: undefined | Movement
 
+  // add initial entry
+  if (vscode.window.activeTextEditor) {
+    const activePosition = vscode.window.activeTextEditor.selection.active
+    const movement: Movement = {
+      filepath: vscode.window.activeTextEditor.document.uri.path,
+      line: activePosition.line,
+      character: activePosition.character,
+    }
+    movementList.push(movement)
+  }
+
   const fileSystemWatcher = vscode.workspace.createFileSystemWatcher('**/*', false, true, false)
   const onDelete = fileSystemWatcher.onDidDelete((uri: vscode.Uri) => {
     movementList = movementList.filter((movement) => {
