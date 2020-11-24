@@ -26,6 +26,17 @@ export function activate(context: vscode.ExtensionContext) {
   let nextMovementIsCausedByThisExtension = false
   let ignoredMovement: undefined | Movement
 
+  const saveMovement = (movement: Movement) => {
+    movementList.push(movement)
+    if (movementList.length > MAX_MOVEMENT_SAVED) {
+      movementList = movementList.slice(50)
+    }
+    debug(`saving movement: ${movement.line}, ${movement.character}, ${movement.filepath}`)
+    debug(`we now have ${movementList.length} items`)
+
+    stepsBack = 0
+  }
+
   // add initial entry
   if (vscode.window.activeTextEditor) {
     const activePosition = vscode.window.activeTextEditor.selection.active
@@ -34,7 +45,7 @@ export function activate(context: vscode.ExtensionContext) {
       line: activePosition.line,
       character: activePosition.character,
     }
-    movementList.push(movement)
+    saveMovement(movement)
   }
 
   const fileSystemWatcher = vscode.workspace.createFileSystemWatcher('**/*', false, true, false)
@@ -92,9 +103,6 @@ export function activate(context: vscode.ExtensionContext) {
           return
         }
 
-        // debug(JSON.stringify(e))
-        debug(`event: ${JSON.stringify(e.kind)}`)
-
         const selection = e.selections[e.selections.length - 1]
         const movement: Movement = {
           filepath: e.textEditor.document.uri.path,
@@ -126,16 +134,7 @@ export function activate(context: vscode.ExtensionContext) {
           debug(`after abandoning we now have ${movementList.length} items`)
         }
 
-        movementList.push(movement)
-        if (movementList.length > MAX_MOVEMENT_SAVED) {
-          movementList = movementList.slice(50)
-        }
-        debug(
-          `saving movement: ${selection.start.line}, ${selection.start.character}, ${movement.filepath}`,
-        )
-        debug(`we now have ${movementList.length} items`)
-
-        stepsBack = 0
+        saveMovement(movement)
       } catch (e) {
         console.error(`crash in selectionChangeListener`)
         console.error(e)
@@ -144,7 +143,6 @@ export function activate(context: vscode.ExtensionContext) {
   )
 
   const handleContentChange = (change: vscode.TextDocumentContentChangeEvent, filepath: string) => {
-    debug('handleContentChange')
     // TODO fix so we change history when files are edited
   }
 
@@ -181,7 +179,7 @@ export function activate(context: vscode.ExtensionContext) {
       debug(activePosition.line)
       debug(activePosition.character)
     } else {
-      debug('Normal go back')
+      // debug('Normal go back')
       stepsBack += 1
     }
 
@@ -190,7 +188,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   const goForward = () => {
     if (stepsBack > 0) {
-      debug('going forward')
+      // debug('going forward')
       stepsBack -= 1
     }
     moveToMovement()
