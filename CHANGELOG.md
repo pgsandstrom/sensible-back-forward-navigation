@@ -2,6 +2,11 @@
 
 All notable changes to the "sensible-back-forward-navigation" extension will be documented in this file.
 
+## 0.3.0
+
+- Fix double entry appearing when triggering 'go to definition'
+- Change how we ignore small movements
+
 ## 0.2.0
 
 - Add initial movement point on start
