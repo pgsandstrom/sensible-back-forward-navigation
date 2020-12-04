@@ -14,8 +14,8 @@ interface Position {
   character: number
 }
 
-// TODO if we stand at the end of a line and move one step to a shorter line, then it will never be ignored, because it wont be "close by". Fix this.
 // TODO if we edit one spot, then step line by line to another spot and edit it, then only one movement is saved. This seems wrong.
+// We should fix this by maybe always adding something when we edit, if we are not close to last movement.
 export function activate(context: vscode.ExtensionContext) {
   const MAX_MOVEMENT_SAVED = 300 // TODO make into config
 
@@ -82,8 +82,8 @@ export function activate(context: vscode.ExtensionContext) {
 
   const isPositionClose = (p1: Position, p2: Position) => {
     const lineDiff = Math.abs(p1.line - p2.line)
-    const characterDiff = Math.abs(p1.character - p2.character)
-    if (lineDiff + characterDiff < 2) {
+    // const characterDiff = Math.abs(p1.character - p2.character)
+    if (lineDiff < 2) {
       return true
     }
 
@@ -161,7 +161,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   const goBack = () => {
-    if (stepsBack >= movementList.length - 1) {
+    if (stepsBack >= movementList.length - 1 && movementList.length > 1) {
       debug(`cannot go further back: ${movementList.length}, ${stepsBack}`)
       return
     }
@@ -204,8 +204,8 @@ export function activate(context: vscode.ExtensionContext) {
     if (stepsBack > 0) {
       // debug('going forward')
       stepsBack -= 1
+      moveToMovement()
     }
-    moveToMovement()
   }
 
   const moveToMovement = async () => {
