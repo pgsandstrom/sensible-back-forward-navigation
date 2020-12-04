@@ -6,14 +6,13 @@ interface Movement {
   filepath: string
   line: number
   character: number
+  timestamp: number
 }
 
 interface Position {
   line: number
   character: number
 }
-
-// TODO maybe create a movement at the current position when the extension is loaded?
 
 // TODO if we stand at the end of a line and move one step to a shorter line, then it will never be ignored, because it wont be "close by". Fix this.
 // TODO if we edit one spot, then step line by line to another spot and edit it, then only one movement is saved. This seems wrong.
@@ -44,6 +43,7 @@ export function activate(context: vscode.ExtensionContext) {
       filepath: vscode.window.activeTextEditor.document.uri.path,
       line: activePosition.line,
       character: activePosition.character,
+      timestamp: new Date().getTime(),
     }
     saveMovement(movement)
   }
@@ -108,6 +108,7 @@ export function activate(context: vscode.ExtensionContext) {
           filepath: e.textEditor.document.uri.path,
           line: selection.start.line,
           character: selection.start.character,
+          timestamp: new Date().getTime(),
         }
 
         if (ignoredMovement !== undefined && isMovementsClose(movement, ignoredMovement)) {
@@ -132,6 +133,19 @@ export function activate(context: vscode.ExtensionContext) {
           debug(`abandoning ${stepsBack} items`)
           movementList = movementList.slice(0, movementList.length - stepsBack)
           debug(`after abandoning we now have ${movementList.length} items`)
+        }
+
+        // check for the buggy double entry that happens when you for example 'go to definition' in vscode.
+        // If the definition is in another open tab, then vscode first opens the tab and then goes to the definiton.
+        // This triggers to movement events. We want to delete the first of those.
+        // TODO make the check even more specific. Make sure second to last was in another file?
+        if (movementList.length > 0) {
+          const lastMovement = movementList[movementList.length - 1]
+          const timeDiff = movement.timestamp - lastMovement.timestamp
+          if (timeDiff < 30 && lastMovement.filepath === movement.filepath) {
+            console.log(`removing buggy double entry. Timediff was ${timeDiff}.`)
+            movementList.splice(-1)
+          }
         }
 
         saveMovement(movement)
