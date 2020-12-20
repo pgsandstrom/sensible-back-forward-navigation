@@ -73,17 +73,17 @@ export function activate(context: vscode.ExtensionContext) {
     },
   )
 
-  const isMovementsClose = (m1: Movement, m2: Movement): boolean => {
+  const isMovementsClose = (m1: Movement, m2: Movement, maxLineDiff = 1): boolean => {
     if (m1.filepath !== m2.filepath) {
       return false
     }
-    return isPositionClose(m1, m2)
+    return isPositionClose(m1, m2, maxLineDiff)
   }
 
-  const isPositionClose = (p1: Position, p2: Position) => {
+  const isPositionClose = (p1: Position, p2: Position, maxLineDiff = 1) => {
     const lineDiff = Math.abs(p1.line - p2.line)
     // const characterDiff = Math.abs(p1.character - p2.character)
-    if (lineDiff < 2) {
+    if (lineDiff <= maxLineDiff) {
       return true
     }
 
@@ -95,66 +95,73 @@ export function activate(context: vscode.ExtensionContext) {
     return latestMovement
   }
 
-  const selectionChangeListener = vscode.window.onDidChangeTextEditorSelection(
-    (e: vscode.TextEditorSelectionChangeEvent) => {
-      try {
-        if (nextMovementIsCausedByThisExtension) {
-          nextMovementIsCausedByThisExtension = false
-          return
-        }
-
-        const selection = e.selections[e.selections.length - 1]
-        const movement: Movement = {
-          filepath: e.textEditor.document.uri.path,
-          line: selection.start.line,
-          character: selection.start.character,
-          timestamp: new Date().getTime(),
-        }
-
-        if (ignoredMovement !== undefined && isMovementsClose(movement, ignoredMovement)) {
-          debug('too close to ignored movement')
-          ignoredMovement = movement
-          return
-        }
-
-        const latestMovement = getLatestMovement()
-        if (latestMovement !== undefined) {
-          if (isMovementsClose(movement, latestMovement)) {
-            debug('too close to latest movement')
-            ignoredMovement = movement
-            return
-          }
-        }
-
-        // if we step back in history and then makes a new movement, abondon the old "branch"
-        if (stepsBack > 0) {
-          debug(`currently ${movementList.length} items`)
-          debug(`at ${stepsBack} steps back`)
-          debug(`abandoning ${stepsBack} items`)
-          movementList = movementList.slice(0, movementList.length - stepsBack)
-          debug(`after abandoning we now have ${movementList.length} items`)
-        }
-
-        // check for the buggy double entry that happens when you for example 'go to definition' in vscode.
-        // If the definition is in another open tab, then vscode first opens the tab and then goes to the definiton.
-        // This triggers to movement events. We want to delete the first of those.
-        // TODO make the check even more specific. Make sure second to last was in another file?
-        if (movementList.length > 0) {
-          const lastMovement = movementList[movementList.length - 1]
-          const timeDiff = movement.timestamp - lastMovement.timestamp
-          if (timeDiff < 30 && lastMovement.filepath === movement.filepath) {
-            console.log(`removing buggy double entry. Timediff was ${timeDiff}.`)
-            movementList.splice(-1)
-          }
-        }
-
-        saveMovement(movement)
-      } catch (e) {
-        console.error(`crash in selectionChangeListener`)
-        console.error(e)
+  const onSelectionChange = (e: vscode.TextEditorSelectionChangeEvent) => {
+    try {
+      if (nextMovementIsCausedByThisExtension) {
+        nextMovementIsCausedByThisExtension = false
+        return
       }
-    },
-  )
+
+      const selection = e.selections[e.selections.length - 1]
+      const movement: Movement = {
+        filepath: e.textEditor.document.uri.path,
+        line: selection.start.line,
+        character: selection.start.character,
+        timestamp: new Date().getTime(),
+      }
+
+      if (ignoredMovement !== undefined && isMovementsClose(movement, ignoredMovement)) {
+        debug('too close to ignored movement')
+        ignoredMovement = movement
+        return
+      }
+
+      const latestMovement = getLatestMovement()
+      if (latestMovement !== undefined && isMovementsClose(movement, latestMovement)) {
+        debug('too close to latest movement')
+        ignoredMovement = movement
+        return
+      }
+
+      // if we step back in history and then makes a new movement, abondon the old "branch"
+      if (stepsBack > 0) {
+        debug(`currently ${movementList.length} items`)
+        debug(`at ${stepsBack} steps back`)
+        debug(`abandoning ${stepsBack} items`)
+        movementList = movementList.slice(0, movementList.length - stepsBack)
+        debug(`after abandoning we now have ${movementList.length} items`)
+      }
+
+      // check for the buggy double entry that happens when you for example 'go to definition' in vscode.
+      // If the definition is in another open tab, then vscode first opens the tab and then goes to the definiton.
+      // This triggers to movement events. We want to delete the first of those.
+      // TODO make the check even more specific. Make sure second to last was in another file?
+      if (movementList.length > 0) {
+        const lastMovement = movementList[movementList.length - 1]
+        const timeDiff = movement.timestamp - lastMovement.timestamp
+        if (timeDiff < 30 && lastMovement.filepath === movement.filepath) {
+          debug(`removing buggy double entry. Timediff was ${timeDiff}.`)
+          movementList.splice(-1)
+        }
+      }
+
+      // when we save movement, if the latest ignored movement is far away from last save, also save that.
+      if (movementList.length > 0 && ignoredMovement) {
+        const lastMovement = movementList[movementList.length - 1]
+        if (!isMovementsClose(lastMovement, ignoredMovement)) {
+          debug('saving ignored movement due to being far away from old and new save point')
+          saveMovement(ignoredMovement)
+        }
+      }
+
+      // save current movement
+      saveMovement(movement)
+    } catch (e) {
+      console.error(`crash in selectionChangeListener`)
+      console.error(e)
+    }
+  }
+  const selectionChangeListener = vscode.window.onDidChangeTextEditorSelection(onSelectionChange)
 
   const handleContentChange = (change: vscode.TextDocumentContentChangeEvent, filepath: string) => {
     // TODO fix so we change history when files are edited
