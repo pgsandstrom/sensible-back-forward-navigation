@@ -4,6 +4,7 @@
   "description": "Improve 'go back' and 'go forward' command is vscode. Movement is grouped in a sensible way.",
   "version": "0.3.0",
   "publisher": "codeandstuff",
+  "icon": "logo/icon.png",
   "engines": {
     "vscode": "^1.51.0"
   },
