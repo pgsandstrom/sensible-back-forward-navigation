@@ -8,4 +8,4 @@ vsc-extension-quickstart.md
 **/webpack.config.js
 **/*.map
 **/*.ts
-**/*.png
+out/test/**
