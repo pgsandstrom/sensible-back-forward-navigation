@@ -2,6 +2,10 @@
 
 All notable changes to the "sensible-back-forward-navigation" extension will be documented in this file.
 
+## 0.4.1
+
+- Cleanup
+
 ## 0.4.0
 
 - When we save a movement, the latest ignored movement is saved if it is not close to old and new saved movement.
