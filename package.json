@@ -11,6 +11,13 @@
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "go",
+    "back",
+    "forward",
+    "navigate",
+    "navigation"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/pgsandstrom/sensible-back-forward-navigation.git"
