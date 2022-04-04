@@ -46,6 +46,12 @@ module.exports = {
     ],
     '@typescript-eslint/no-unnecessary-condition': ['error'],
     '@typescript-eslint/strict-boolean-expressions': ['error'],
+    'sort-imports': [
+      'error',
+      {
+        ignoreDeclarationSort: true,
+      },
+    ],
 
     // here is frontend/backend exclusive rules
 
