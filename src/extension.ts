@@ -204,14 +204,14 @@ export function activate(context: vscode.ExtensionContext) {
       stepsBack += 1
     }
 
-    moveToMovement()
+    void moveToMovement()
   }
 
   const goForward = () => {
     if (stepsBack > 0) {
       // debug('going forward')
       stepsBack -= 1
-      moveToMovement()
+      void moveToMovement()
     }
   }
 
