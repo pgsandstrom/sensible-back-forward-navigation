@@ -2,6 +2,10 @@
 
 All notable changes to the "sensible-back-forward-navigation" extension will be documented in this file.
 
+## 0.4.3
+
+- Update dependencies
+
 ## 0.4.2
 
 - Add license
